@@ -18,6 +18,7 @@ class TurtlebotController : public rclcpp::Node{
 
         std::string robot_name;
         double goal_x, goal_y;
+        double goal_th = 0;
 
         double real_x = 0, real_y = 0, real_th = 0;
         double k_l[1] = {1};

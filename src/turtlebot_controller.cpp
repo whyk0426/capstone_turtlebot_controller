@@ -24,6 +24,9 @@ TurtlebotController::TurtlebotController() : Node("turtlebot_controller"){
 
     this->declare_parameter("goal_y", 0.0);
     goal_y = this->get_parameter("goal_y").as_double();
+
+    this->declare_parameter("goal_th", 0.0);
+    goal_y = this->get_parameter("goal_th").as_double();
 }
 
 
@@ -57,7 +60,6 @@ void TurtlebotController::cmd_timer_callback(){
 
     double x_d = goal_x - real_x;
     double y_d = goal_y - real_y;
-    double goal_th = atan2(y_d, x_d);
 
     double error_distance = sqrt(x_d * x_d + y_d * y_d);
     double error_theta = goal_th - real_th;
