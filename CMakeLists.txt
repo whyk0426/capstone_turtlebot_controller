@@ -37,6 +37,7 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(turtlebot_controller
+        src/turtlebot_controller_main.cpp
         src/turtlebot_controller.cpp)
 ament_target_dependencies(turtlebot_controller ${ROS2_PACKAGES})
 install(TARGETS turtlebot_controller
