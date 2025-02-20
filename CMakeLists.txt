@@ -44,7 +44,7 @@ install(TARGETS turtlebot_controller
   DESTINATION lib/${PROJECT_NAME})
 
 #install launch file
-install(DIRECTORY launch config
+install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
 

@@ -8,6 +8,8 @@
 #include "tf2/exceptions.h"
 #include <cmath>
 
+#include "std_msgs/msg/string.hpp"
+
 class TurtlebotController : public rclcpp::Node{
     public:
         TurtlebotController();
@@ -15,6 +17,7 @@ class TurtlebotController : public rclcpp::Node{
     private:
         void tf_timer_callback();
         void cmd_timer_callback();
+        void topic_callback(const std_msgs::msg::String::SharedPtr msg);
 
         std::string robot_name;
         double goal_x, goal_y;
@@ -30,6 +33,7 @@ class TurtlebotController : public rclcpp::Node{
     rclcpp::TimerBase::SharedPtr cmd_timer, tf_timer;
     std::unique_ptr<tf2_ros::Buffer> tf_buffer;
     std::shared_ptr<tf2_ros::TransformListener> tf_listner;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr topic_subscription;
 };
 
 #endif // TURTLEBOT_CONTROLLER_HPP

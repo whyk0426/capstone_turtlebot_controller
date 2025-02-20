@@ -16,6 +16,9 @@ TurtlebotController::TurtlebotController() : Node("turtlebot_controller"){
     tf_timer = this->create_wall_timer(
         10ms, std::bind(&TurtlebotController::tf_timer_callback, this));
 
+    topic_subscription = this->create_subscription<std_msgs::msg::String>(
+        "/map_info", 10, std::bind(&TurtlebotController::topic_callback, this, std::placeholders::_1));
+
     this->declare_parameter("robot_name", "robot_name");
     robot_name = this->get_parameter("robot_name").as_string();
 
@@ -26,7 +29,7 @@ TurtlebotController::TurtlebotController() : Node("turtlebot_controller"){
     goal_y = this->get_parameter("goal_y").as_double();
 
     this->declare_parameter("goal_th", 0.0);
-    goal_y = this->get_parameter("goal_th").as_double();
+    goal_th = this->get_parameter("goal_th").as_double();
 }
 
 
@@ -93,4 +96,10 @@ void TurtlebotController::cmd_timer_callback(){
     RCLCPP_INFO(this->get_logger(), "goal_x:{%f}, goal_y:{%f}", goal_x, goal_y);
 
     cmd_publisher->publish(cmd_vel);
+}
+
+
+void TurtlebotController::topic_callback(const std_msgs::msg::String::SharedPtr msg){
+    RCLCPP_INFO(this->get_logger(), "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    RCLCPP_INFO(this->get_logger(), "I heard: %s", msg->data.c_str());
 }
