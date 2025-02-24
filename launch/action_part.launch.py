@@ -9,10 +9,18 @@ def generate_launch_description():
             executable='turtlebot_controller',
             output='screen',
             parameters=[{'robot_name': 'Lima',
-                         'goal_x': 1.0, 
-                         'goal_y': 0.0
                          }]
         ),
+        # Node(
+        #     package='capstone_turtlebot_controller',
+        #     namespace='Lima',
+        #     executable='turtlebot_controller',
+        #     output='screen',
+        #     parameters=[{'robot_name': 'Lima',
+        #                  'goal_x': 1.0, 
+        #                  'goal_y': 0.0
+        #                  }]
+        # ),
         # Node(
         #     package='capstone_turtlebot_controller',
         #     namespace='Alpha',
@@ -23,14 +31,15 @@ def generate_launch_description():
         #                  'goal_y': 0.0
         #                  }]
         # ),
-        Node(
-            package='capstone_turtlebot_controller',
-            namespace='Romeo',
-            executable='turtlebot_controller',
-            output='screen',
-            parameters=[{'robot_name': 'Romeo',
-                         'goal_x': 0.0, 
-                         'goal_y': 0.0
-                         }]
-        ),
+    #     Node(
+    #         package='capstone_turtlebot_controller',
+    #         namespace='Romeo',
+    #         executable='turtlebot_controller',
+    #         output='screen',
+    #         parameters=[{'robot_name': 'Romeo',                                                                                          
+    #                      'goal_x': 0.0, 
+    #                      'goal_y': 0.0
+    #                      }]
+    #     ),
+    
     ])

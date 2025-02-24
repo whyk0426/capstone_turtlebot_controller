@@ -7,29 +7,30 @@ const double pi = 3.14159265358979323846;
 
 TurtlebotController::TurtlebotController() : Node("turtlebot_controller"){
     cmd_publisher = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
+    arrival_pulisher = this->create_publisher<std_msgs::msg::String>("/arrival", 10);
+
+    topic_subscription = this->create_subscription<geometry_msgs::msg::Point>(
+        "/goal_state", 10, std::bind(&TurtlebotController::topic_callback, this, std::placeholders::_1));
 
     tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_listner = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
+    tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
 
     cmd_timer = this->create_wall_timer(
         10ms, std::bind(&TurtlebotController::cmd_timer_callback, this));
     tf_timer = this->create_wall_timer(
         10ms, std::bind(&TurtlebotController::tf_timer_callback, this));
 
-    topic_subscription = this->create_subscription<std_msgs::msg::String>(
-        "/map_info", 10, std::bind(&TurtlebotController::topic_callback, this, std::placeholders::_1));
-
     this->declare_parameter("robot_name", "robot_name");
     robot_name = this->get_parameter("robot_name").as_string();
 
-    this->declare_parameter("goal_x", 0.0);
-    goal_x = this->get_parameter("goal_x").as_double();
+    // this->declare_parameter("goal_x", 0.0);
+    // goal_x = this->get_parameter("goal_x").as_double();
 
-    this->declare_parameter("goal_y", 0.0);
-    goal_y = this->get_parameter("goal_y").as_double();
+    // this->declare_parameter("goal_y", 0.0);
+    // goal_y = this->get_parameter("goal_y").as_double();
 
-    this->declare_parameter("goal_th", 0.0);
-    goal_th = this->get_parameter("goal_th").as_double();
+    // this->declare_parameter("goal_th", 0.0);
+    // goal_th = this->get_parameter("goal_th").as_double();
 }
 
 
@@ -63,6 +64,7 @@ void TurtlebotController::cmd_timer_callback(){
 
     double x_d = goal_x - real_x;
     double y_d = goal_y - real_y;
+    double goal_th = atan2(y_d, x_d);
 
     double error_distance = sqrt(x_d * x_d + y_d * y_d);
     double error_theta = goal_th - real_th;
@@ -77,10 +79,16 @@ void TurtlebotController::cmd_timer_callback(){
     if (error_distance < 0.1){
       RCLCPP_WARN(this->get_logger(), "distance arrived");
       cmd_vel.linear.x = 0;
-      if(abs(error_theta) <0.1){
-        RCLCPP_WARN(this->get_logger(), "angular arrived");
-        cmd_vel.angular.z = 0;
-      }
+      cmd_vel.angular.z = 0;
+
+      std_msgs::msg::String msg;
+      msg.data = "Arriving";
+      arrival_pulisher->publish(msg);
+
+      // if(abs(error_theta) <0.1){
+      //   RCLCPP_WARN(this->get_logger(), "angular arrived");
+      //   cmd_vel.angular.z = 0;
+      // }
     }
     if (cmd_vel.linear.x > 0.2)
       cmd_vel.linear.x = 0.2;
@@ -99,7 +107,11 @@ void TurtlebotController::cmd_timer_callback(){
 }
 
 
-void TurtlebotController::topic_callback(const std_msgs::msg::String::SharedPtr msg){
-    RCLCPP_INFO(this->get_logger(), "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
-    RCLCPP_INFO(this->get_logger(), "I heard: %s", msg->data.c_str());
+void TurtlebotController::topic_callback(const geometry_msgs::msg::Point::SharedPtr msg){
+    RCLCPP_INFO(this->get_logger(), "#############################################################");
+    RCLCPP_INFO(this->get_logger(), "Received goal state: goal_x=%f, goal_y=%f", msg->x, msg->y);
+    
+    goal_x = msg->x;
+    goal_y = msg->y;
 }
+
