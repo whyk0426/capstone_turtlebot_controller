@@ -101,7 +101,7 @@ void TurtlebotController::cmd_timer_callback(){
       cmd_vel.angular.z = -2.84; 
     
     RCLCPP_INFO(this->get_logger(), "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    RCLCPP_INFO(this->get_logger(), "goal_x:{%f}, goal_y:{%f}", goal_x, goal_y);
+    RCLCPP_INFO(this->get_logger(), "error_distance:{%f}, linear.x {%f}",error_distance, cmd_vel.linear.x);
 
     cmd_publisher->publish(cmd_vel);
 }
