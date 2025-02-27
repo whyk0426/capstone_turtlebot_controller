@@ -13,6 +13,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 
 set(ROS2_PACKAGES
@@ -21,7 +22,8 @@ set(ROS2_PACKAGES
   geometry_msgs
   tf2
   tf2_ros
-  visualization_msgs)
+  visualization_msgs
+  sensor_msgs)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 

@@ -6,10 +6,10 @@
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2/exceptions.h"
+#include "sensor_msgs/msg/laser_scan.hpp"
 #include <cmath>
 
-#include "geometry_msgs/msg/point.hpp"
-#include "std_msgs/msg/string.hpp"
+enum SCAN_STATE {PARALLELING, GAP_TUNNING, LEFT_FACE,};
 
 class TurtlebotController : public rclcpp::Node{
     public:
@@ -17,10 +17,12 @@ class TurtlebotController : public rclcpp::Node{
 
     private:
         void tf_timer_callback();
+        void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
         void cmd_timer_callback();
-        void topic_callback(const geometry_msgs::msg::Point::SharedPtr msg);
+        double angular_calculator(double d1, double d2);
 
         std::string robot_name;
+        std::string scan_name;
         double goal_x = 0.0;
         double goal_y = 0.0;
         double goal_th = 0.0;
@@ -30,13 +32,23 @@ class TurtlebotController : public rclcpp::Node{
         double k_a[1] = {1};
 
         bool tf_flag = false;
+        bool scan_flag = false;
+        bool theta_flag = false;
+        bool theta_flag2 = false;
 
+        SCAN_STATE scan_state = PARALLELING;
+
+        double lidar_distance[360] = {0};
+
+    //Subscriber
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscriber; 
+    //Publisher
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_publisher;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr arrival_pulisher;
-    rclcpp::TimerBase::SharedPtr cmd_timer, tf_timer;
+    //TF Listener
     std::unique_ptr<tf2_ros::Buffer> tf_buffer;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener;
-    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr topic_subscription;
+    //Timer
+    rclcpp::TimerBase::SharedPtr cmd_timer, tf_timer;  
 };
 
 #endif // TURTLEBOT_CONTROLLER_HPP
