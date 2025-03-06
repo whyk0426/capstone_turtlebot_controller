@@ -19,7 +19,6 @@ class TurtlebotController : public rclcpp::Node{
         void tf_timer_callback();
         void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
         void cmd_timer_callback();
-        double angular_calculator(double d1, double d2);
 
         std::string robot_name;
         std::string scan_name;
@@ -28,16 +27,16 @@ class TurtlebotController : public rclcpp::Node{
         double goal_th = 0.0;
 
         double real_x = 0, real_y = 0, real_th = 0;
-        double k_l[1] = {1};
-        double k_a[1] = {1};
+        double k_p[1] = {0.05};
+        double k_l[1] = {0.05};
 
         bool tf_flag = false;
         bool scan_flag = false;
-        bool theta_flag = false;
-        bool theta_flag2 = false;
+        bool left_face_flag = false;
 
         SCAN_STATE scan_state = PARALLELING;
 
+        double wild_lidar_distance[360] = {0};
         double lidar_distance[360] = {0};
 
     //Subscriber

@@ -7,11 +7,13 @@ TurtlebotController::TurtlebotController() : Node("cmd_publisher"){
     //Parameter
     this->declare_parameter("robot_name", "robot_name");
     robot_name = this->get_parameter("robot_name").as_string();
-    this->declare_parameter("scan_name", "/scan");
+    this->declare_parameter("scan_name", "scan_name");
     scan_name = this->get_parameter("scan_name").as_string();
 
     //subscriber
-    scan_subscriber = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&TurtlebotController::scan_callback, this, _1));
+    rclcpp::QoS qos = rclcpp::QoS(10).best_effort();
+    scan_subscriber = this->create_subscription<sensor_msgs::msg::LaserScan>(
+        scan_name, qos, std::bind(&TurtlebotController::scan_callback, this ,std::placeholders::_1));
     
     //publisher
     cmd_publisher = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
@@ -27,22 +29,31 @@ TurtlebotController::TurtlebotController() : Node("cmd_publisher"){
 
 
 void TurtlebotController::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg){
-    float angle_min = msg->angle_min;
-    // float angle_max = msg->angle_max;
     float angle_increment = msg->angle_increment;
     scan_flag = true;
 
+    std::fill(std::begin(wild_lidar_distance), std::end(wild_lidar_distance), 0.0);
     std::fill(std::begin(lidar_distance), std::end(lidar_distance), 0.0);
-    RCLCPP_WARN(this->get_logger(), "##########################################");
+    
     size_t num_points = msg->ranges.size();
     for(size_t i=0; i<num_points; i++){
-        int index = static_cast<int>((angle_min + i * angle_increment) * (180.0 / M_PI));
+        int index = static_cast<int>((i * angle_increment) * (180.0 / M_PI));
         if (index >= 0 && index < 360) {
-            lidar_distance[index] = std::isnan(msg->ranges[i]) ? 0.0 : msg->ranges[i];
+            wild_lidar_distance[index] = std::isnan(msg->ranges[i]) ? 0.0 : msg->ranges[i];
         }
-        
-        RCLCPP_WARN(this->get_logger(), "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-        RCLCPP_WARN(this->get_logger(), "[index]: {%f}", lidar_distance[index]);
+    }
+    for (int j = 0; j < 360; j++){
+        double distance_sum = 0.0;
+        int distance_sum_ea = 0;
+
+        for (int k = -2; k <= 2; k++){
+            int neighbor_k = (j + k + 360) % 360;
+            if (wild_lidar_distance[neighbor_k] != 0){
+                distance_sum += wild_lidar_distance[neighbor_k];
+                distance_sum_ea++;
+            }
+        }
+        lidar_distance[j] = (distance_sum_ea != 0) ? (distance_sum / distance_sum_ea) : 0.0;
     }
 }
 
@@ -51,177 +62,113 @@ void TurtlebotController::cmd_timer_callback(){
     if (!tf_flag)
         return;
 
-    double front_distance = 0.0;
-    double front_left_distance = 0.0;
-    double front_right_distance = 0.0;
-
-    double right_distance = 0.0;
-    double right_front_distance = 0.0;
-    double right_back_distance = 0.0;
-
-    double closest_distance = std::numeric_limits<double>::max();
+    double front_closest = std::numeric_limits<double>::max();
+    double right_closest = std::numeric_limits<double>::max();
+    int front_closest_degree;
+    int right_closest_degree;
 
     geometry_msgs::msg::Twist cmd_vel;
 
-    for (int i = -2; i < 3; i++){
-        int j = i + 360;
-        if (j > 359)
-            j -= 360; 
-        front_distance += lidar_distance[j];
-        // RCLCPP_INFO(this->get_logger(), "front_distance {%f}", lidar_distance[j]);
-        right_distance += lidar_distance[i+270];
-        // RCLCPP_INFO(this->get_logger(), "right_distance {%f}", lidar_distance[i+270]);
+    for (int i = -20; i <= 20; i++){
+        int neighbor_i = (i + 360) % 360;
+        if (front_closest > lidar_distance[neighbor_i] && lidar_distance[neighbor_i] != 0){
+            front_closest = lidar_distance[neighbor_i];
+            front_closest_degree = neighbor_i;
+        }
     }
-    for (int i = -4; i < 5; i++){
-        front_left_distance += lidar_distance[i+5];
-        front_right_distance += lidar_distance[i+355];
-        right_front_distance += lidar_distance[i+275];
-        right_back_distance += lidar_distance[i+265];
-        // RCLCPP_INFO(this->get_logger(), "front_left_distance {%f}", lidar_distance[i+5]);
-        // RCLCPP_INFO(this->get_logger(), "front_right_distance {%f}", lidar_distance[i+355]);
-        // RCLCPP_INFO(this->get_logger(), "right_front_distance {%f}", lidar_distance[i+275]);
-        // RCLCPP_INFO(this->get_logger(), "right_back_distance {%f}", lidar_distance[i+265]);
-    }
-    for (int i = 0; i < 13; i++){
-        if (closest_distance > lidar_distance[i+270] && lidar_distance[i+270] != 0){
-            closest_distance = lidar_distance[i+270];
+    for (int i = -30; i <= 50; i++){
+        if (right_closest > lidar_distance[i + 270] && lidar_distance[i + 270] != 0){
+            right_closest = lidar_distance[i + 270];
+            right_closest_degree = i + 270;
         }
     }
 
-    front_distance /= 5;
-    right_distance /= 5;
-    front_left_distance /= 9;
-    front_right_distance /= 9;
-    right_front_distance /= 9;
-    right_back_distance /= 9;
-    // RCLCPP_INFO(this->get_logger(), "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
-    // RCLCPP_INFO(this->get_logger(), "front_distance {%f}", front_distance);
-    // RCLCPP_INFO(this->get_logger(), "right_distance {%f}", right_distance);
-    double error_th = goal_th - real_th;
-    if (error_th > M_PI)
-        error_th -= 2 * M_PI;
-    else if (error_th < - M_PI)
-        error_th += 2 * M_PI;
+    RCLCPP_INFO(this->get_logger(), "front_closest {%d}={%f}", front_closest_degree, front_closest);
+    RCLCPP_INFO(this->get_logger(), "right_closest {%d}={%f}", right_closest_degree, right_closest);
 
-    cmd_vel.linear.x = 0.2;
+    cmd_vel.linear.x = 2.0;
 
     switch(scan_state){
         case PARALLELING:{
-            if (front_distance < 0.5)
+            if (front_closest < 0.3)
                 scan_state = LEFT_FACE;
-                
-            if (closest_distance < 0.1)
-                cmd_vel.linear.x = 0.0;
-
-            double right_gap = right_back_distance - right_front_distance;
-            if(abs(right_gap) < 0.01){
-                cmd_vel.angular.z = 0;
-                scan_state = GAP_TUNNING;
-            }
-            else if(right_gap > 0.01){
-                if (!theta_flag){
-                goal_th = real_th + angular_calculator(right_back_distance, right_front_distance);
-                theta_flag = true;
-                }
-                cmd_vel.angular.z = 0.5;
-                if (abs(right_gap) < 0.01){
-                    cmd_vel.angular.z = 0;
-                    scan_state = GAP_TUNNING;
-                    theta_flag = false;
-                }
-            }
-            else if(right_gap < -0.01){
-                if (!theta_flag){
-                goal_th = real_th - angular_calculator(right_front_distance, right_back_distance);
-                theta_flag = true;
-                }
-                if (abs(right_gap) < 0.01){
-                    cmd_vel.angular.z = 0;
-                    scan_state = GAP_TUNNING;
-                    theta_flag = false;
-                }
-            }
+            
+            int right_error_degree = right_closest_degree - 270;
+            cmd_vel.angular.z = k_p[0] * right_error_degree;
             RCLCPP_INFO(this->get_logger(), "case: PARALLELING");
             break;
         }
-        case GAP_TUNNING:{
-            double error_gap = 0.3 - right_distance;
-            if (abs(error_gap) < 0.02){
-                cmd_vel.angular.z = 0;
-                scan_state = PARALLELING;
-            }
-            else if(error_gap > 0.02){
-                if(!theta_flag){
-                    goal_th = real_th + M_PI / 6;
-                    theta_flag = true;
-                }
-                cmd_vel.angular.z = 0.2 * (2 - sqrt(3)) / error_gap;
-                if (abs(error_th) < 0.01){
-                    if(!theta_flag2){
-                        goal_th = real_th - M_PI / 6;
-                        theta_flag2 = true;
-                    }
-                }
-                if (theta_flag2){
-                    cmd_vel.angular.z = - 0.2 * (2 - sqrt(3)) / error_gap;
-                    if(abs(error_th) < 0.01){
-                        cmd_vel.angular.z = 0;
-                        theta_flag = false;
-                        theta_flag2 = false;
-                    }
-                }
-            }
-            else if(error_gap < - 0.02){
-                if(!theta_flag){
-                    goal_th = real_th - M_PI / 6;
-                    theta_flag = true;
-                }
-                cmd_vel.angular.z = - 0.2 * (2 - sqrt(3)) / error_gap;
-                if (abs(error_th) < 0.01){
-                    if(!theta_flag2){
-                        goal_th = real_th + M_PI / 6;
-                        theta_flag2 = true;
-                    }
-                }
-                if (theta_flag2){
-                    cmd_vel.angular.z = 0.2 * (2 - sqrt(3)) / error_gap;
-                    if(abs(error_th) < 0.01){
-                        cmd_vel.angular.z = 0;
-                        theta_flag = false;
-                        theta_flag2 = false;
-                    }
-                }
-            }
-            RCLCPP_INFO(this->get_logger(), "case: GAP_TUNNING");
-            break;
-        }
         case LEFT_FACE:{
-            if (!theta_flag){
-            goal_th = real_th + M_PI / 2 - angular_calculator(front_right_distance, front_left_distance);
-            theta_flag = true;
-            }
-            cmd_vel.angular.z = 1.0;
-            if (abs(error_th) < 0.01){
-                cmd_vel.angular.z = 0;
+            left_face_flag = true;
+            if (front_closest_degree > 180)
+                front_closest_degree -= 360;
+            int front_error_degree = front_closest_degree + 90;
+            cmd_vel.angular.z = k_l[0] * front_error_degree;
+            if (front_closest > right_closest)
                 scan_state = PARALLELING;
-                theta_flag = false;
-            }
             RCLCPP_INFO(this->get_logger(), "case: LEFT_FACE");
             break;
         }
+        case GAP_TUNNING:{
+            cmd_vel.angular.z = 0;
+            scan_state = PARALLELING;
+            // double error_gap = 0.3 - right_distance;
+            // if (abs(error_gap) < 0.02){
+            //     cmd_vel.angular.z = 0;
+            //     scan_state = PARALLELING;
+            // }
+            // else if(error_gap > 0.02){
+            //     if(!theta_flag){
+            //         goal_th = real_th + M_PI / 6;
+            //         theta_flag = true;
+            //     }
+            //     cmd_vel.angular.z = 0.2 * (2 - sqrt(3)) / error_gap;
+            //     if (abs(error_th) < 0.01){
+            //         if(!theta_flag2){
+            //             goal_th = real_th - M_PI / 6;
+            //             theta_flag2 = true;
+            //         }
+            //     }
+            //     if (theta_flag2){
+            //         cmd_vel.angular.z = - 0.2 * (2 - sqrt(3)) / error_gap;
+            //         if(abs(error_th) < 0.01){
+            //             cmd_vel.angular.z = 0;
+            //             theta_flag = false;
+            //             theta_flag2 = false;
+            //         }
+            //     }
+            // }
+            // else if(error_gap < - 0.02){
+            //     if(!theta_flag){
+            //         goal_th = real_th - M_PI / 6;
+            //         theta_flag = true;
+            //     }
+            //     cmd_vel.angular.z = - 0.2 * (2 - sqrt(3)) / error_gap;
+            //     if (abs(error_th) < 0.01){
+            //         if(!theta_flag2){
+            //             goal_th = real_th + M_PI / 6;
+            //             theta_flag2 = true;
+            //         }
+            //     }
+            //     if (theta_flag2){
+            //         cmd_vel.angular.z = 0.2 * (2 - sqrt(3)) / error_gap;
+            //         if(abs(error_th) < 0.01){
+            //             cmd_vel.angular.z = 0;
+            //             theta_flag = false;
+            //             theta_flag2 = false;
+            //         }
+            //     }
+            // }
+            RCLCPP_INFO(this->get_logger(), "case: GAP_TUNNING");
+            break;
+        }
     }
-    // cmd_publisher->publish(cmd_vel);
-    RCLCPP_INFO(this->get_logger(), "w = {%f}", cmd_vel.angular.z);
-}
-
-
-double TurtlebotController::angular_calculator(double d1, double d2){
-    double l = sqrt(d1 * d1 + d2 * d2 - 2 * d1 * d2 * cos(M_PI / 18));
-    double ratio = d1 * sin(M_PI / 18) / l;
-    ratio = std::clamp(ratio, -1.0, 1.0);
-    double alpha = asin(ratio) - M_PI * 85 / 180;
-
-    return alpha;
+    if (cmd_vel.angular.z > 2.84)
+        cmd_vel.angular.z = 2.84;
+    if (cmd_vel.angular.z < -2.84)
+        cmd_vel.angular.z = -2.84; 
+    cmd_publisher->publish(cmd_vel);
+    RCLCPP_INFO(this->get_logger(), "v = {%f}, w = {%f}", cmd_vel.linear.x, cmd_vel.angular.z);
 }
 
 
